@@ -12,10 +12,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#ifndef BUF_SIZE // override with cc -D 
-#define BUF_SIZE 1024
-#endif
-
 #define BFLAG 1 << 0
 #define WFLAG 1 << 1
 #define LFLAG 1 << 2
