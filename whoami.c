@@ -3,7 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define BUF_SIZE 101
+#define BUF_SIZE 200
 
 int main(int argc, char *argv[]) {
   uid_t id = geteuid();
