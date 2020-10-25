@@ -5,7 +5,6 @@
  * Suggestions for improvement:
  * - Smarter number printing (variable size depending on number of digits)
  * - Long options (e.g. --chars)
- * - Read from stdin if no input
  */
 #include <fcntl.h>
 #include <stdio.h>
@@ -18,43 +17,37 @@
 
 enum state { IN, OUT }; // defines if in or outside word
 void parseopts(int argc, char *argv[], int *flags);
+void count(int fd, int *bcnt, int *wcnt, int *lcnt);
 void printcnts(int bcnt, int wcnt, int lcnt, int flags, char *filename);
 
 int main(int argc, char *argv[]) {
   int flags = 0;
+  int nfiles = argc - optind;
+  int fd, i, bcnt, wcnt, lcnt;
+  int btot = 0, wtot = 0, ltot = 0;
+  char *filename;
 
   // note that this changes global optind variable
   parseopts(argc, argv, &flags);
 
-  int argind = optind;
-
-  if (argind == argc) {
-    printf("No file(s) specified\n");
-    exit(1);
+  // no file specified - read from stdin
+  if (nfiles == 0) {
+    fd = STDIN_FILENO;
+    count(fd, &bcnt, &wcnt, &lcnt);
+    printcnts(bcnt, wcnt, lcnt, flags, NULL);
   }
 
-  int multifile = argc - argind > 1;
-  int bcnt, wcnt, lcnt;
-  int btot = 0, wtot = 0, ltot = 0;
-  int fd;
-  char c;
-  char *filename;
-  enum state state = OUT;
-  for (; argind < argc; argind++) {
+  // at least one file
+  for (i = optind; i < argc; i++) {
     bcnt = wcnt = lcnt= 0;
-    filename = argv[argind];
+    filename = argv[i];
     fd = open(filename, O_RDONLY);
-
-    while (read(fd, &c, 1) != 0) {
-      bcnt++;
-      if (c == '\n') lcnt++;
-      if (c == '\n' || c == ' ' || c == '\t') state = OUT;
-      else if (state == OUT) {
-        state = IN;
-        wcnt++;
-      }
+    if (fd == -1) {
+      perror(filename);
+      exit(EXIT_FAILURE);
     }
 
+    count(fd, &bcnt, &wcnt, &lcnt);
     printcnts(bcnt, wcnt, lcnt, flags, filename);
 
     btot += bcnt;
@@ -64,7 +57,7 @@ int main(int argc, char *argv[]) {
     close(fd);
   }
 
-  if (multifile) 
+  if (nfiles > 1) 
     printcnts(btot, wtot, ltot, flags, "total");
 
   return 0;
@@ -78,15 +71,29 @@ void parseopts(int argc, char *argv[], int *flags) {
     case 'c': *flags |= BFLAG; break;
     case 'w': *flags |= WFLAG ; break;
     case 'l': *flags |= LFLAG; break;
-    case '?': exit(1);
+    case '?': exit(EXIT_FAILURE);
     default:
-      printf("An error occurred parsing options");
-      exit(1);
+      fprintf(stderr, "An error occurred parsing options");
+      exit(EXIT_FAILURE);
     }
   }
 
   // turn on all flags if none specified 
   if (!*flags) *flags = BFLAG | WFLAG | LFLAG;
+}
+
+void count(int fd, int *bcnt, int *wcnt, int *lcnt) {
+  char c;
+  enum state state = OUT;
+  while (read(fd, &c, 1) != 0) {
+    (*bcnt)++;
+    if (c == '\n') (*lcnt)++;
+    if (c == '\n' || c == ' ' || c == '\t') state = OUT;
+    else if (state == OUT) {
+      state = IN;
+      (*wcnt)++;
+    }
+  }
 }
 
 void printcnts(int bcnt, int wcnt, int lcnt, int flags, char *filename) {
